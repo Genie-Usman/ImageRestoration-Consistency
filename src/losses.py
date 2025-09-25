@@ -18,7 +18,7 @@ class PerceptualConsistencyLoss:
         self.lambda_lpips = 0.5
         self.lambda_vgg_feats = 0.1
         self.lambda_tv = 1e-5  # Weight for Total Variation Loss
-        self.lambda_color = 0.1 # Weight for Color Consistency Loss
+        self.lambda_color = 0.15 # Weight for Color Consistency Loss
 
     def __call__(self, y_hat, y, y_hat_T_pred, y_hat_T_gt):
         # Image Normalization for VGG input
