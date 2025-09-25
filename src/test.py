@@ -18,7 +18,7 @@ def save_image(tensor, path):
 
 def main():
     # paths
-    checkpoint_path = "experiments/checkpoints/model_final.pth"
+    checkpoint_path = "experiments/checkpoints/best.pth"
     input_folder = "data/val/low"       # run on validation low-light images
     output_folder = "output_results"
     os.makedirs(output_folder, exist_ok=True)
@@ -46,5 +46,5 @@ def main():
         save_image(y_hat, out_path)
         print(f"Saved restored image: {out_path}")
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     main()

@@ -15,9 +15,9 @@ class PerceptualConsistencyLoss:
         
         # Loss weights, optimized based on low-light enhancement practices
         self.lambda_l1 = 1.0
-        self.lambda_lpips = 0.05
+        self.lambda_lpips = 0.5
         self.lambda_vgg_feats = 0.1
-        self.lambda_tv = 1e-4  # Weight for Total Variation Loss
+        self.lambda_tv = 1e-5  # Weight for Total Variation Loss
         self.lambda_color = 0.1 # Weight for Color Consistency Loss
 
     def __call__(self, y_hat, y, y_hat_T_pred, y_hat_T_gt):
@@ -60,4 +60,3 @@ class PerceptualConsistencyLoss:
         tv_h = torch.pow(img[:, :, 1:, :] - img[:, :, :-1, :], 2).sum()
         tv_w = torch.pow(img[:, :, :, 1:] - img[:, :, :, :-1], 2).sum()
         return (tv_h + tv_w) / (b * c * h * w)
-

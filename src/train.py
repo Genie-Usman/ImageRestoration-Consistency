@@ -60,8 +60,8 @@ def main():
     lpips_fn = lpips.LPIPS(net='vgg').to(device)
 
     # Training config
-    epochs = 100
-    patience = 10
+    epochs = 150
+    patience = 30
     best_lpips = float("inf")
     no_imp_epochs = 0
 
