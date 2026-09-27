@@ -1,4 +1,5 @@
 import os
+import random
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -7,31 +8,40 @@ import numpy as np
 from dataset import PairedImageDataset
 from model import UNetTiny
 from losses import PerceptualConsistencyLoss
-from transforms import apply_transform_batch
+from transforms import apply_consistency_transform, apply_transform_batch
 from utils import psnr
 from skimage.metrics import structural_similarity as ssim
 import lpips
 import csv
+
+def set_seed(seed=42):
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 def compute_metrics(y_hat, y, lpips_fn, device):
     """Compute PSNR, SSIM, LPIPS for a batch."""
     y_hat_np = y_hat.detach().cpu().numpy().transpose(0, 2, 3, 1)
     y_np = y.detach().cpu().numpy().transpose(0, 2, 3, 1)
 
-    psnr_scores, ssim_scores, lpips_scores = [], [], []
-
+    psnr_scores, ssim_scores = [], []
     for i in range(y.shape[0]):
         psnr_scores.append(psnr(y_hat[i], y[i]).item())
         ssim_scores.append(
             ssim(y_np[i], y_hat_np[i], channel_axis=-1, data_range=1.0)
         )
-        lp = lpips_fn(y_hat[i].unsqueeze(0).to(device), y[i].unsqueeze(0).to(device))
-        lpips_scores.append(lp.item())
+
+    with torch.no_grad():
+        lpips_scores = lpips_fn(y_hat, y).flatten().detach().cpu().tolist()
 
     return np.mean(psnr_scores), np.mean(ssim_scores), np.mean(lpips_scores)
 
 
 def main():
+    set_seed(42)
+
     # Paths
     train_low = 'data/train/low'
     train_high = 'data/train/high'
@@ -56,8 +66,8 @@ def main():
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5)
     loss_fn = PerceptualConsistencyLoss(device=device)
 
-    # LPIPS metric
-    lpips_fn = lpips.LPIPS(net='vgg').to(device)
+    # LPIPS metric (normalized for [0, 1] inputs)
+    lpips_fn = lpips.LPIPS(net='vgg', normalize=True).to(device)
 
     # Training config
     epochs = 150
@@ -66,7 +76,7 @@ def main():
     no_imp_epochs = 0
 
     # CSV logging
-    log_file = 'experiments/metrics_log.csv'
+    log_file = 'experiments/checkpoints/metrics_log.csv'
     with open(log_file, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(["Epoch", "TrainLoss", "ValPSNR", "ValSSIM", "ValLPIPS"])
@@ -83,13 +93,15 @@ def main():
 
             # forward
             y_hat = model(x)
-            x_T = apply_transform_batch(x)
+
+            # Consistency transform: apply IDENTICAL geometric transform to both x and y_hat
+            x_T, y_hat_T_gt = apply_consistency_transform(x, y_hat.detach())
             y_hat_T_pred = model(x_T)
-            y_hat_T_gt = apply_transform_batch(y_hat.detach())
 
             # loss
             loss = loss_fn(y_hat, y, y_hat_T_pred, y_hat_T_gt)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             opt.step()
             running_loss.append(loss.item())
             loop.set_postfix(loss=np.mean(running_loss))

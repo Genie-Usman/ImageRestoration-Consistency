@@ -1,0 +1,37 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.venv/
+env/
+venv/
+ENV/
+build/
+dist/
+
+# PyTorch checkpoints and models
+*.pth
+*.pt
+*.ckpt
+!experiments/checkpoints/best.pth
+
+# Data archives and temporary outputs
+*.zip
+*.tar.gz
+data/lol_dataset.zip
+output_results/
+output_results/*
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logs
+*.log

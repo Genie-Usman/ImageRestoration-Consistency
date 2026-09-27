@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 # -----------------------------
 # CBAM Block
@@ -92,6 +93,13 @@ class UNetTiny(nn.Module):
         self.out_conv = nn.Conv2d(32, out_ch, kernel_size=1)
 
     def forward(self, x):
+        # Auto-pad to multiple of 8 if needed (prevents shape mismatch in pooling/decoder)
+        H, W = x.shape[2], x.shape[3]
+        pad_h = (8 - H % 8) % 8
+        pad_w = (8 - W % 8) % 8
+        if pad_h > 0 or pad_w > 0:
+            x = F.pad(x, (0, pad_w, 0, pad_h), mode='reflect')
+
         # Encoder
         e1 = self.enc1(x)
         e2 = self.enc2(self.pool1(e1))
@@ -108,4 +116,10 @@ class UNetTiny(nn.Module):
         d1 = self.up1(d2)
         d1 = self.dec1(torch.cat([d1, e1], dim=1))
 
-        return torch.sigmoid(self.out_conv(d1))
+        out = torch.sigmoid(self.out_conv(d1))
+
+        # Unpad back to original spatial dimensions
+        if pad_h > 0 or pad_w > 0:
+            out = out[:, :, :H, :W]
+
+        return out

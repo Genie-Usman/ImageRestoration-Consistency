@@ -1,0 +1,9 @@
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio
+lpips>=0.1.4
+tqdm>=4.64.0
+pillow>=9.0.0
+scikit-image>=0.20.0
+matplotlib>=3.7.0
+opencv-python>=4.7.0
