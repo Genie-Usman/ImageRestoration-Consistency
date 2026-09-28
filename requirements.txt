@@ -7,3 +7,4 @@ pillow>=9.0.0
 scikit-image>=0.20.0
 matplotlib>=3.7.0
 opencv-python>=4.7.0
+onnx>=1.14.0

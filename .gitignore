@@ -17,6 +17,7 @@ dist/
 *.pt
 *.ckpt
 !experiments/checkpoints/best.pth
+!experiments/checkpoints_unettiny_scratch/best.pth
 
 # Data archives and temporary outputs
 *.zip
