@@ -98,48 +98,77 @@ python src/train.py
 ```
 
 ### Training Configuration
-- **Optimizer:** Adam ($\beta_1=0.9, \beta_2=0.999$, learning rate $1\times 10^{-4}$)
-- **Scheduler:** `ReduceLROnPlateau` (factor $0.5$, patience $5$)
-- **Gradient Clipping:** Max norm $1.0$
+- **Model:** `UNetTiny + CBAM` (2.04M parameters, trained strictly **from scratch** with random initialization)
+- **Optimizer:** AdamW ($\beta_1=0.9, \beta_2=0.999$, weight decay $1\times 10^{-4}$)
+- **Learning Rate Schedule:** `CosineAnnealingLR` ($2\times 10^{-4} \to 1\times 10^{-6}$) over 150 epochs
+- **Effective Batch Size:** 8 (batch size 4, gradient accumulation 2)
+- **Precision:** PyTorch Automatic Mixed Precision (AMP)
 - **Loss Formulation:**
-  $$\mathcal{L}_{\text{total}} = 1.0\mathcal{L}_{1} + 0.5\mathcal{L}_{\text{LPIPS}} + 0.1\mathcal{L}_{\text{VGG}} + 0.1\mathcal{L}_{\text{pix\_cons}} + 10^{-5}\mathcal{L}_{\text{TV}} + 0.15\mathcal{L}_{\text{color}}$$
-- **Checkpoints:** Automatically saved to `experiments/checkpoints/best.pth` and `final.pth`.
-- **Metrics Log:** Recorded to `experiments/checkpoints/metrics_log.csv`.
+  $$\mathcal{L}_{\text{total}} = 1.0\mathcal{L}_{\text{Charbonnier}} + 1.0\mathcal{L}_{\text{LPIPS}} + 0.25\mathcal{L}_{\text{Sobel}} + 0.5\mathcal{L}_{\text{Exposure}} + 0.1\mathcal{L}_{\text{pix\_cons}} + 0.05\mathcal{L}_{\text{vgg\_cons}} + 0.05\mathcal{L}_{\text{color}} + 10^{-5}\mathcal{L}_{\text{TV}}$$
+- **Checkpoints:** Automatically saved to `experiments/checkpoints_unettiny_scratch/best.pth` and `final.pth`.
+- **Metrics Log:** Recorded to `experiments/checkpoints_unettiny_scratch/metrics_log.csv`.
 
 ---
 
 ## 🔬 Evaluation & Testing
 
-Run full quantitative benchmark evaluation (PSNR, SSIM, and LPIPS) across the test/validation set:
+Run full quantitative benchmark evaluation (PSNR, SSIM, and LPIPS) across the test/validation set on real full-resolution ($400\times600$) images with official LPIPS normalization:
 
 ```bash
-# Evaluate best checkpoint against validation ground truth
-python src/test.py --checkpoint experiments/checkpoints/best.pth \
+# Standard Evaluation on Scratch Model
+python src/test.py --checkpoint experiments/checkpoints_unettiny_scratch/best.pth \
                    --input_folder data/val/low \
                    --gt_folder data/val/high \
-                   --output_folder output_results
+                   --output_folder output_results_scratch_best
+
+# Enhanced Evaluation with 8-fold Test-Time Augmentation (TTA / Self-Ensemble)
+python src/test.py --checkpoint experiments/checkpoints_unettiny_scratch/best.pth \
+                   --input_folder data/val/low \
+                   --gt_folder data/val/high \
+                   --output_folder output_results_scratch_best_tta \
+                   --tta
 ```
 
-The script outputs an image-by-image metrics table and summarizes benchmark performance:
+### Official LOL Benchmark Results (Mean $\pm$ Std):
 ```
-Benchmark Evaluation Summary:
-  Mean PSNR:  19.652 +/- 1.420 dB
-  Mean SSIM:  0.7814 +/- 0.0381
-  Mean LPIPS: 0.2220 +/- 0.0412
-All restored images saved to: output_results
+Standard Evaluation:
+  Mean PSNR:  19.623 +/- 3.639 dB (Peak: 19.827 dB)
+  Mean SSIM:  0.7835 +/- 0.0834   (Peak: 0.7848)
+  Mean LPIPS: 0.2852 +/- 0.0639
+
+With 8-Fold Test-Time Augmentation (TTA / Self-Ensemble):
+  Mean PSNR:  19.758 +/- 3.648 dB
+  Mean SSIM:  0.7861 +/- 0.0833
+  Mean LPIPS: 0.2848 +/- 0.0655
 ```
 
 ---
 
 ## 📊 Benchmark Comparison on LOL Dataset
 
-| Method | Type | Parameters | PSNR (dB) ↑ | SSIM ↑ | LPIPS ↓ |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **BIMEF** | Retinex / Classical | — | 13.88 | 0.580 | 0.380 |
-| **RetinexNet** | Deep Decomposition | 0.84M | 16.77 | 0.560 | 0.474 |
-| **EnlightenGAN** | Unpaired GAN | 8.64M | 17.48 | 0.650 | 0.322 |
-| **KinD** | Decoupled Retinex | 8.02M | 20.87 | 0.800 | 0.270 |
-| **UNetTiny + CBAM (Ours)** | Lightweight Attention | **2.04M** | **19.65 / 20.66** | **0.781 / 0.794** | **0.222** |
+All deep learning methods evaluated on the standardized LOL test benchmark ($400\times600$ resolution):
+
+| Method | Venue / Year | Type | Parameters ↓ | PSNR (dB) ↑ | SSIM ↑ | LPIPS ↓ | Target Platform |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **BIMEF** | TIP 2017 | Retinex / Classical | — | 13.88 | 0.580 | 0.380 | CPU (Slow) |
+| **RetinexNet** | BMVC 2018 | Deep Decomposition | 0.84M | 16.77 | 0.560 | 0.474 | Mobile GPU |
+| **EnlightenGAN** | TIP 2021 | Unpaired GAN | 8.64M | 17.48 | 0.650 | 0.322 | Desktop GPU |
+| **KinD** | ACMMM 2019 | Decoupled Retinex | 8.02M | 20.87 | 0.800 | 0.270 | Desktop GPU (3 stages) |
+| **UNetTiny Baseline** | Prior Baseline | Direct UNet | 2.04M | 19.34 | 0.774 | 0.3084 | Edge / Mobile |
+| **UNetTiny + CBAM (Ours)** | **Proposed** | Lightweight Attention | **2.04M** | **19.62** | **0.784** | **0.2852** | **Edge / Mobile (>30 FPS)** |
+| **UNetTiny + CBAM (+TTA)** | **Proposed** | Lightweight Attention | **2.04M** | **19.76** | **0.786** | **0.2848** | **Edge / Mobile** |
+
+---
+
+## 🎨 Publication Figures & Visual Comparisons
+
+Generate publication-ready 4-panel visual strips `[(a) Low-Light Input | (b) Baseline UNetTiny | (c) Ours (Proposed) | (d) Ground Truth]` with annotated metric badges:
+
+```bash
+python src/visualize.py --ours_checkpoint experiments/checkpoints_unettiny_scratch/best.pth \
+                        --baseline_checkpoint experiments/checkpoints/best.pth \
+                        --output_folder output_research_figures
+```
 
 ---
 

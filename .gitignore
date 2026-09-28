@@ -21,6 +21,7 @@ dist/
 # Data archives and temporary outputs
 *.zip
 *.tar.gz
+*.whl
 data/lol_dataset.zip
 output_results/
 output_results/*
