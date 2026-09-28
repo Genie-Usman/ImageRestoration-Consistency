@@ -167,7 +167,7 @@ Generate publication-ready 4-panel visual strips `[(a) Low-Light Input | (b) Bas
 ```bash
 python src/visualize.py --ours_checkpoint experiments/checkpoints_unettiny_scratch/best.pth \
                         --baseline_checkpoint experiments/checkpoints/best.pth \
-                        --output_folder output_research_figures
+                        --output_folder output_figures
 ```
 
 ---
